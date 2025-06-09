@@ -1,0 +1,150 @@
+---
+title: "Project_1"
+author: "Ryan Betz"
+date: "2025-06-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+For this project we will be using the dataset "Fitness_Tracker_Data.csv", this data includes information regarding fitness metrics. The goal of this project is to analyze columns "Steps" and "Heart_Rate_avg" from the dataset. I am looking to explore the relationship between these variables using a k-nearest neighbors predictive model. <br><br>
+(https://www.kaggle.com/datasets/narinder06/fitness-tracker-data)
+
+```{r, message=FALSE}
+#import and install required libraries
+library(kknn)
+
+#read in dataset
+df_fit = read.csv('Fitness_Tracker_Data.csv')
+
+#show dimensions of data
+dim(df_fit)
+```
+```{r k-nearest neighbors}
+#split data into x and y variables
+xall = df_fit$Steps
+yall = df_fit$Heart_Rate_avg
+
+#create new dataframe with selected columns
+df = data.frame(xall,yall)
+ntrain = 75
+
+set.seed(123)
+tr = sample(x=1:nrow(df), size=ntrain)
+
+#create train and test data
+train = df[tr,]
+test = df[-tr,] #complement of train data
+
+#select k values
+k_vals = c(1, 20, 75)
+#create empty list to store predicted y values for each k
+all_predict_val = list()
+i = 1
+
+#loop through each k value and store into list
+for (k in k_vals) {
+  
+  knn = kknn(yall ~ xall, train=train, test=test, k=k, kernel='rectangular')
+  predict_val = fitted(knn)
+  
+  all_predict_val[[i]] = predict_val
+  i = i + 1
+}
+
+#sort x and predicted y-values for smoother lines
+sorted_y = list()
+j = 1
+for (j in 1:length(all_predict_val)) {
+  predict_y = all_predict_val[[j]]
+  sort = order(test$xall)
+  sorted_x = test$xall[sort]
+  sorted_y[[j]] = predict_y[sort]
+}
+
+#plotting
+par(mfrow=c(1,3), mar=c(4,4,1,1))
+
+plot(xall, yall, main='k=1',
+     xlab='Steps', ylab='Heart Rate Avg',
+     )
+lines(sorted_x, sorted_y[[1]], col='red')
+points(sorted_x, sorted_y[[1]], pch = 20, col='green')
+
+
+plot(xall, yall, main='k=20',
+     xlab='Steps', ylab='Heart Rate Avg')
+lines(sorted_x, sorted_y[[2]], col='red')
+points(sorted_x, sorted_y[[2]], pch = 20, col='green')
+
+plot(xall, yall, main='k=75',
+     xlab='Steps', ylab='Heart Rate Avg')
+lines(sorted_x, sorted_y[[3]], col='red')
+points(sorted_x, sorted_y[[3]], pch = 20, col='green')
+
+```
+
+As the k value increases the complexity of the plots decrease. This is due to the k-value averaging in more neighbors around points from the test data on the x-axis. The plot with k=1 signifies low bias and high variance, indicating overfitting. Where as the plot with k=75 signifies high bias and low variance, indicating underfitting. 
+
+```{r bias-variance tradeoff}
+kvec = 1:75
+nk = length(kvec)
+
+#pre-allocating memory
+outRMSE = rep(0,nk)
+inRMSE = rep(0,nk)
+
+#loop through values of k to fit on train data and predict on test data
+for (i in 1:nk) {
+  kmod = kknn(yall ~ xall, train=train, test=test, k=kvec[i], kernel='rectangular')
+  kmodtr = kknn(yall ~ xall, train=train, test=train, k=kvec[i], kernel='rectangular')
+
+  outRMSE[i] = sqrt(mean((test[,2]-kmod$fitted)^2))
+  inRMSE[i] = sqrt(mean((train[,2]-kmodtr$fitted)^2))
+}
+
+#plotting
+par(mfrow=c(1,2),mar=c(4,4,1,1))
+
+plot(kvec, outRMSE, type='l',
+     xlab='k', ylab='OutRMSE and InRMSE',
+     col='red', ylim=range(inRMSE)*1.5)
+lines(kvec, inRMSE, col='blue')
+legend(x='topright', cex=0.5, legend=c('OutRMSE','InRMSE'),
+       fill=c('red','blue'))
+
+plot(log(1/kvec), outRMSE, type='l',
+     xlab='log(1/k)', ylab='outRMSE and inRMSE',
+     col='red', ylim=range(inRMSE)*1.5)
+lines(log(1/kvec), inRMSE, col='blue')
+legend(x='topright', cex=0.5, legend=c('OutRMSE','InRMSE'),
+       fill=c('red','blue'))
+
+```
+
+The plots above show the effects of bias variance tradeoff in k-nearest neighbors with varying k values. The goal of analyzing this effect is to find an optimal k-value that minimizes the out of sample root mean squared error. The following code will find the best k value and fit on a knn model. 
+
+```{r kbest}
+#k value where out of sample root mean squared error is lowest
+kbest = kvec[which.min(outRMSE)]
+
+#compute knn for the value of kbest
+knnbest = kknn(yall ~ xall, train=train, test=test, k=kbest, kernel='rectangular')
+
+predict_vals = fitted(knnbest)
+
+sort_best = order(test$xall)
+sorted_xbest = test$xall[sort_best]
+sorted_ybest = predict_vals[sort_best]
+
+plot(xall, yall, main=paste('k=',kbest),
+     xlab='Steps', ylab='Heart Rate Avg')
+lines(sorted_x, sorted_ybest, col='red')
+points(sorted_x, sorted_ybest, pch=20, col='green')
+
+
+```
+
+

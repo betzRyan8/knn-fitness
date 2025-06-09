@@ -1,0 +1,22 @@
+.Rhistory
+.RData
+.Rproj.user/
+.Rprofile
+.Renviron
+*.html
+*.pdf
+*.log
+*.aux
+*.bbl
+*.blg
+*.lof
+*.lot
+*.toc
+*.synctex.gz
+*.vrb
+*.snm
+*.nav
+*.fdb_latexmk
+*.fls
+*.gz
+# Fitness_Tracker_Data.csv
